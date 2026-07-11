@@ -1,5 +1,10 @@
 # HALOVIA 制谱器 — Chart Editor
 
+> **⚠️ 归档存档 — 不再维护**
+> 此分支（`v4R`）为旧版存档，已永久冻结。所有开发已迁移至 [`v5R`](https://github.com/halovia-game/chart-editor/tree/v5R) 分支。
+>
+> 最后稳定版本：`v4.0` | 开发工具：Reasonix
+
 基于 Web 的 HALOVIA 谱面编辑器，纯前端零依赖，支持 `file://` 本地直接打开。
 
 ## 快速开始
