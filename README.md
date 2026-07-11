@@ -1,9 +1,9 @@
 # HALOVIA 制谱器 — Chart Editor
 
-> **⏸️ 分支已冻结 — 不再维护**
-> 此分支（`v5OC`）已完成历史使命，已永久冻结。所有开发已迁移至 [`v5R`](https://github.com/halovia-game/chart-editor/tree/v5R) 分支。
+> **🚀 当前开发分支**
+> 此分支（`v5R`）为当前活跃开发分支，由 Reasonix 驱动。
 >
-> 最后稳定版本：`v5.0` | 开发工具：OpenCode
+> 历史存档：[`v4R`](https://github.com/halovia-game/chart-editor/tree/v4R) · [`v5OC`](https://github.com/halovia-game/chart-editor/tree/v5OC)
 
 基于 Web 的 HALOVIA 谱面编辑器，纯前端零依赖，支持 `file://` 本地直接打开。
 
@@ -121,8 +121,6 @@ index.html
 
 ## 分支规划
 
-| 分支 | 用途 | 维护策略 |
-|------|------|---------|
 | 分支 | 用途 | 维护策略 |
 |------|------|---------|
 | `main` | 稳定主线 | 仅通过 `v5R` merge 进入，**禁止直接提交** |
