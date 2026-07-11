@@ -118,11 +118,12 @@ index.html
 
 | 分支 | 用途 | 维护策略 |
 |------|------|---------|
-| `main` | 稳定主线 | 仅通过 `v5` merge 进入，**禁止直接提交** |
-| `v5` | 当前开发分支 | 日常开发在此进行，定期 merge 到 `main` |
+| `main` | 稳定主线 | 仅通过 `v5OC` / `v5R` merge 进入，**禁止直接提交** |
+| `v5OC` | 当前开发分支（Open Canvas） | 日常开发在此进行，定期 merge 到 `main` |
+| `v5R` | v5 发布/稳定分支（Release） | 从 `v5OC` 同步，用于发布前整合 |
 | `v4R` | 旧版存档 | 不再维护，保留历史 |
 
-工作流：`v5` 开发 → `git merge v5` 到 `main`（仅 merge，不 rebase）
+工作流：`v5OC` 开发 → `git merge v5OC` 到 `main`（仅 merge，不 rebase）；`v5R` 从 `v5OC` 同步用于发布准备。
 
 ## 开发
 
