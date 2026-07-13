@@ -56,12 +56,41 @@ previewCanvas.addEventListener("mousedown", function(e) {
     kfs.splice(ins, 0, { time: gameT, x: nx, y: ny, hidden: false });
     kfIdx = ins;
     if (typeof renderTrackPanels === "function") renderTrackPanels();
+    // 立即滚动到新关键帧位置，和松手后保持一致
+    _scrollToKeyframe(bestTi, ins);
+    // 记录新建关键帧轨道和索引，松手后再次确保滚动到位
+    previewKF._createdTrack = bestTi;
+    previewKF._createdIns = ins;
   }
   timeline.draggingKF = { trackId: bestTi, kfIdx: kfIdx, startX: mx, origTime: gameT };
   previewKF.dragging = true; previewKF.trackId = bestTi; previewKF.kfIdx = kfIdx;
   previewKF.startX = mx; previewKF.startY = my;
   previewKF.origX = kfs[kfIdx].x; previewKF.origY = kfs[kfIdx].y;
+  _scrollToKeyframe(bestTi, kfIdx);
 });
+
+function _scrollToKeyframe(trackId, insIdx) {
+  // 水平：滚动到该轨道面板
+  if (typeof scrollToTrack === "function") scrollToTrack(trackId);
+  // 垂直：等一帧后居中关键帧
+  requestAnimationFrame(function() {
+    var c = document.getElementById("trackPanels");
+    if (!c) return;
+    var p = c.querySelectorAll(".track-panel");
+    for (var oi = 0; oi < state.openedTracks.length && oi < p.length; oi++) {
+      if (state.openedTracks[oi] === trackId) {
+        var st = p[oi].querySelectorAll("strong");
+        for (var si = 0; si < st.length; si++) {
+          if (st[si].textContent === "#" + insIdx) {
+            st[si].scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+            break;
+          }
+        }
+        break;
+      }
+    }
+  });
+}
 
 previewCanvas.addEventListener("mousemove", function(e) {
   if (!previewKF.dragging) return;
@@ -76,12 +105,16 @@ previewCanvas.addEventListener("mousemove", function(e) {
   if (track && track.keyframes[previewKF.kfIdx]) {
     track.keyframes[previewKF.kfIdx].x = previewKF.origX + dx;
     track.keyframes[previewKF.kfIdx].y = previewKF.origY + dy;
-    scheduleSizeEstimate();
-    // 实时刷新面板，节流避免频繁 DOM 操作
-    if (typeof renderTrackPanels === "function" && (!previewKF._lastRefresh || Date.now() - previewKF._lastRefresh > 80)) {
-      previewKF._lastRefresh = Date.now();
-      renderTrackPanels();
+    // 只更新输入框数值，不重建 DOM，避免 scrollTop 重置
+    if (!previewKF._lastInputRefresh || Date.now() - previewKF._lastInputRefresh > 80) {
+      previewKF._lastInputRefresh = Date.now();
+      var tid = previewKF.trackId, kfIdx = previewKF.kfIdx;
+      var xi = document.querySelector('input[data-tid="' + tid + '"][data-si="' + kfIdx + '"][data-pk="x"]');
+      var yi = document.querySelector('input[data-tid="' + tid + '"][data-si="' + kfIdx + '"][data-pk="y"]');
+      if (xi) xi.value = (previewKF.origX + dx).toFixed(3);
+      if (yi) yi.value = (previewKF.origY + dy).toFixed(3);
     }
+    scheduleSizeEstimate();
   }
 });
 
@@ -91,6 +124,11 @@ previewCanvas.addEventListener("mouseup", function() {
     timeline.draggingKF = null;
     scheduleSizeEstimate();
     if (typeof renderTrackPanels === "function") renderTrackPanels();
+    // 松手后再次确保滚动到新关键帧位置
+    if (previewKF._createdTrack >= 0) {
+      _scrollToKeyframe(previewKF._createdTrack, previewKF._createdIns);
+      previewKF._createdTrack = -1;
+    }
   }
 });
 
@@ -98,6 +136,7 @@ previewCanvas.addEventListener("mouseleave", function() {
   if (previewKF.dragging) {
     previewKF.dragging = false;
     timeline.draggingKF = null;
+    previewKF._createdTrack = -1;
   }
 });
 
@@ -137,6 +176,8 @@ function togglePreviewFullscreen() {
     var btn = document.getElementById("previewFsBtn");
     if (btn) btn.remove();
     resizePreview();
+    // 同步播放按钮状态
+    document.getElementById("btnPlay").textContent = game.playing ? "⏸" : "▶";
   } else {
     // 进入伪全屏（继续播放）
     if (!game.playing) { syncGlobals(); game.playing = true; game.paused = false; game.startRealTime = performance.now(); game.startGameTime = game.gameTime; }
@@ -162,14 +203,16 @@ function startPreview() {
   game.startRealTime = performance.now(); game.startGameTime = game.gameTime;
   game.autoHits = new Set(); game.judgments = {}; game.combo = 0; game.score = 0;
   game.holdRingShrink = {}; game.effects = [];
-  document.getElementById("btnPlay").textContent = "⏸ 暂停";
+  document.getElementById("btnPlay").textContent = "⏸";
   if (state.audioBuffer) startAudioAt(game.gameTime);
+  if (typeof updateLoopUI === "function") updateLoopUI();
 }
 
 function pausePreview() {
   game.playing = false; game.paused = true;
-  document.getElementById("btnPlay").textContent = "▶ 播放";
+  document.getElementById("btnPlay").textContent = "▶";
   stopAudio();
+  if (typeof updateLoopUI === "function") updateLoopUI();
 }
 
 function stopPlay() {
@@ -177,7 +220,7 @@ function stopPlay() {
   game.startGameTime = 0; game.autoHits = new Set(); game.judgments = {};
   game.combo = 0; game.score = 0; game.effects = []; game.holdRingShrink = {}; game.keysDown = {};
   game.playFromAFlag = false;
-  document.getElementById("btnPlay").textContent = "▶ 播放";
+  document.getElementById("btnPlay").textContent = "▶";
   document.getElementById("timeSlider").value = 0;
   updateTimeDisplay(); stopAudio();
   if (typeof updateLoopUI === "function") updateLoopUI();
@@ -188,11 +231,11 @@ document.addEventListener("DOMContentLoaded", function() {
   if (slider) {
     slider.addEventListener("input", function() {
       if (game.playing) pausePreview();
+      cancelPlayModes();
       syncGlobals();
       var ratio = this.value / 1000;
       game.gameTime = ratio * state.duration;
-      game.startGameTime = game.gameTime; game.autoHits = new Set(); game.judgments = {};
-      game.combo = 0; game.score = 0;
+      game.startGameTime = game.gameTime; game.autoHits = new Set();
       updateTimeDisplay();
     });
   }
@@ -228,10 +271,11 @@ function renderLoop() {
         if (game.playFromAFlag) {
           game.playFromAFlag = false;
           state.loopEnabled = false;
-          updateLoopUI();
-          game.playing = false;
+          game.playing = false; game.paused = false;
           stopAudio();
           game.gameTime = state.loopB;
+          document.getElementById("btnPlay").textContent = "▶";
+          updateLoopUI();
         } else {
           game.gameTime = state.loopA;
           game.startGameTime = state.loopA;

@@ -257,7 +257,7 @@ h3 { font-size: 0.85em; margin-bottom: 4px; color: var(--fg2); }
 }
 
 .track-panel {
-  flex: 0 0 430px;
+  flex: 0 0 370px;
   background: var(--bg2);
   border-right: 1px solid var(--border);
   padding: 8px;
@@ -266,6 +266,8 @@ h3 { font-size: 0.85em; margin-bottom: 4px; color: var(--fg2); }
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow-anchor: none;
+  scroll-snap-align: start;
 }
 
 .track-panel-header {
@@ -309,15 +311,15 @@ h3 { font-size: 0.85em; margin-bottom: 4px; color: var(--fg2); }
   flex: 0 0 auto;
 }
 
-.segment-row .field input[type="number"] { width: 54px; }
-.segment-row .field input.expr-input { width: 54px; }
+.segment-row .field input[type="number"] { width: 65px; }
+.segment-row .field input.expr-input { width: 65px; }
 
 .segment-row .field select {
-  min-width: 80px;
+  min-width: 96px;
 }
 
 .segment-row .field.expr { flex: 0 1 auto; }
-.segment-row .field.expr input { width: 140px; }
+.segment-row .field.expr input { width: 168px; }
 
 .segment-row .field-spacer { flex: 1 1 auto; }
 
@@ -387,6 +389,45 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 input[type="number"] { width: 80px; }
 input[type="file"] { width: auto; max-width: 200px; font-size: 0.75em; padding: 2px; }
 textarea { width: 100%; min-height: 40px; font-family: monospace; resize: vertical; }
+
+/* ============================================================
+   Floating Label on Border
+   标签骑跨在输入框上边框，标签上边界决定整体上边界
+   ============================================================ */
+
+.float-label {
+  position: relative;
+  align-self: flex-start;
+  margin-top: 0.5em;
+}
+
+.float-label > label {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  transform: translateY(-50%);
+  padding: 0 4px;
+  font-size: 0.7em;
+  line-height: 1.2;
+  color: var(--fg2);
+  background: var(--float-label-bg, var(--bg2));
+  z-index: 1;
+  white-space: nowrap;
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* Ensure inputs inside float-label still look correct */
+.float-label > input,
+.float-label > select,
+.float-label > textarea {
+  margin-top: 0;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
 
 .row {
   display: flex;
@@ -486,6 +527,29 @@ button.danger:hover { background: #c0392b; }
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+/* Scratch 风格图标按钮 */
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background: var(--accent2);
+  border: 1px solid var(--accent2);
+  color: #fff;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover {
+  background: var(--btn);
+  border-color: var(--btn);
 }
 
 .preview-wrap {
@@ -664,8 +728,8 @@ button.danger:hover { background: #c0392b; }
   border: 1px solid var(--accent);
   border-radius: 8px;
   padding: 18px 20px;
-  max-width: 620px;
-  width: 90%;
+  max-width: 341px;
+  width: 49.5%;
   max-height: 85vh;
   overflow-y: auto;
 }
@@ -679,6 +743,11 @@ button.danger:hover { background: #c0392b; }
   margin-top: 8px;
 }
 
+/* 浮动标签在 modal 中不受 margin-top 影响 */
+.modal .float-label > label {
+  margin-top: 0;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
@@ -687,9 +756,9 @@ button.danger:hover { background: #c0392b; }
   flex-wrap: wrap;
 }
 
-.modal input[type="number"] { width: 100px; }
-.modal input[type="text"], .modal input:not([type]) { width: 200px; }
-.modal select { min-width: 100px; }
+.modal input[type="number"] { width: 65px; }
+.modal input[type="text"], .modal input:not([type]) { width: 65px; }
+.modal select { min-width: 96px; }
 .modal textarea { width: 100%; }
 
 /* Key mapping list */
@@ -730,19 +799,81 @@ button.danger:hover { background: #c0392b; }
   font-size: 0.9em;
 }
 
-.keymap-row .key-display {
-  font-family: monospace;
-  background: var(--bg4);
-  padding: 2px 8px;
-  border-radius: 3px;
-  min-width: 80px;
-  text-align: center;
-  font-size: 0.85em;
+/* 按键列表 */
+.key-list {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
 }
-
-.keymap-row .key-display.unbound {
+.key-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  background: var(--bg4);
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-family: monospace;
+  white-space: nowrap;
+  color: var(--fg);
+  cursor: pointer;
+  position: relative;
+  min-width: 28px;
+}
+.key-badge::before {
+  content: attr(data-key);
+  display: block;
+  visibility: visible;
+}
+.key-badge::after {
+  content: "×";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+}
+.key-badge:hover {
+  background: rgba(231, 76, 60, 0.2);
+  color: var(--err);
+}
+.key-badge:hover::before {
+  color: transparent;
+}
+.key-badge:hover::after {
+  opacity: 1;
+}
+/* 添加按钮：不变叉号 */
+.key-badge.add {
+  background: transparent;
+  border: 2px dashed var(--fg3);
   color: var(--fg3);
-  font-style: italic;
+  cursor: pointer;
+  padding: 1px 7px;
+  width: 28px;
+  text-align: center;
+  font-size: 1.1em;
+  line-height: 1;
+  font-weight: bold;
+}
+.key-badge.add::after {
+  content: none;
+}
+.key-badge.add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+/* 绑定中问号：不变色无悬浮 */
+.keymap-row.binding .key-badge.add,
+.keymap-row.binding .key-badge.add:hover {
+  border-color: var(--fg3);
+  color: var(--fg3);
+  background: transparent;
+  cursor: default;
 }
 
 /* Result modal */

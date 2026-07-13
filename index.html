@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HALOVIA 制谱器 v5</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -45,10 +45,11 @@
         <div class="preview-header">
           <h2>预览 / 试玩</h2>
           <div class="preview-toolbar">
-            <button onclick="togglePlay()" id="btnPlay">▶ 播放</button>
-            <button onclick="stopPlay()">⏹ 停止</button>
-            <button class="secondary" onclick="showPlayModal()">🎮 试玩</button>
-            <button class="secondary" onclick="togglePreviewFullscreen()">⛶ 全屏</button>
+            <button class="icon-btn" onclick="togglePlay()" id="btnPlay" title="播放">▶</button>
+            <button class="icon-btn" onclick="stopPlay()" title="停止">⏹</button>
+            <button class="icon-btn" onclick="togglePreviewFullscreen()" title="全屏">⛶</button>
+            <span style="flex:1;"></span>
+            <button class="icon-btn" onclick="showPlayModal()" title="试玩">🎮</button>
             <label class="inline-chk"><input type="checkbox" id="chkBeatLines" checked> 节拍线</label>
           </div>
         </div>
@@ -118,9 +119,9 @@
     </section>
   </main>
 </div>
-<div class="modal-overlay" id="importModal"><div class="modal"><h2>导入谱面</h2><label>选择格式</label><select id="importFormat"><option value="hvp">.hvp (十进制编码)</option><option value="hvf">.hvf (JSON完整)</option></select><label>粘贴内容</label><textarea id="importText" rows="6" placeholder="粘贴 .hvp 字符串或 .hvf JSON..."></textarea><label>或上传文件</label><input type="file" id="importFile" accept=".hvp,.hvf,.txt,.json"><div class="modal-actions"><button onclick="doImport()">导入</button><button class="secondary" onclick="closeImportModal()">取消</button></div></div></div>
-<div class="modal-overlay" id="noteEditModal"><div class="modal"><h2>编辑音符</h2><div class="row"><div><label>轨道</label><input type="text" class="expr-input" id="editTrack"></div><div><label>类型</label><select id="editType"><option value="1">Tap</option><option value="2">Keep</option><option value="3">Hold</option></select></div></div><div class="row"><div><label>时间</label><input type="text" class="expr-input" id="editTime"></div><div><label>单位</label><select id="editTimeUnit"><option value="sec">秒</option><option value="beat">拍</option></select></div></div><div class="row" id="editDurationRow"><div><label>持续时长</label><input type="text" class="expr-input" id="editDuration"></div><div><label>单位</label><select id="editDurationUnit"><option value="sec">秒</option><option value="beat">拍</option></select></div></div><div class="modal-actions"><button class="danger" onclick="deleteEditingNote()">删除</button><span style="flex:1;"></span><button class="secondary" onclick="closeNoteEditModal()">取消</button><button onclick="saveEditingNote()">确定</button></div></div></div>
-<div class="modal-overlay" id="keyMapModal"><div class="modal"><h2>键位映射</h2><p class="hint">点击轨道行后按下键盘按键完成绑定（支持 Shift/Ctrl/Alt 修饰键）。</p><div id="keyMapList"></div><div class="modal-actions"><button class="secondary" onclick="resetKeyMapDefault()">重置默认</button><button class="secondary" onclick="closeKeyMapModal()">取消</button><button onclick="confirmKeyMapAndPlay()">确认并开始</button></div></div></div>
+<div class="modal-overlay" id="importModal"><div class="modal"><h2>导入谱面</h2><div class="float-label"><label>选择格式</label><select id="importFormat"><option value="hvp">.hvp (十进制编码)</option><option value="hvf">.hvf (JSON完整)</option></select></div><div class="float-label"><label>粘贴内容</label><textarea id="importText" rows="6" placeholder="粘贴 .hvp 字符串或 .hvf JSON..."></textarea></div><div class="float-label"><label>或上传文件</label><input type="file" id="importFile" accept=".hvp,.hvf,.txt,.json"></div><div class="modal-actions"><button onclick="doImport()">导入</button><button class="secondary" onclick="closeImportModal()">取消</button></div></div></div>
+<div class="modal-overlay" id="noteEditModal"><div class="modal"><h2>编辑音符</h2><div class="row"><div class="float-label"><label>轨道</label><input type="text" class="expr-input" id="editTrack"></div><div class="float-label"><label>类型</label><select id="editType"><option value="1">Tap</option><option value="2">Keep</option><option value="3">Hold</option></select></div></div><div class="row"><div class="float-label"><label>时间</label><input type="text" class="expr-input" id="editTime"></div><div class="float-label"><label>单位</label><select id="editTimeUnit"><option value="sec">秒</option><option value="beat">拍</option></select></div></div><div class="row" id="editDurationRow"><div class="float-label"><label>持续时长</label><input type="text" class="expr-input" id="editDuration"></div><div class="float-label"><label>单位</label><select id="editDurationUnit"><option value="sec">秒</option><option value="beat">拍</option></select></div></div><div class="modal-actions"><button class="danger" onclick="deleteEditingNote()">删除</button><span style="flex:1;"></span><button class="secondary" onclick="closeNoteEditModal()">取消</button><button onclick="saveEditingNote()">确定</button></div></div></div>
+<div class="modal-overlay" id="keyMapModal"><div class="modal"><h2>键位映射</h2><p class="hint">点击 [+] 添加按键，悬停按键后点击删除。</p><div id="keyMapList"></div><div class="modal-actions"><button class="secondary" onclick="resetKeyMapDefault()">重置默认</button><button class="secondary" onclick="closeKeyMapModal()">取消</button><button style="margin-left:auto" onclick="confirmKeyMapAndPlay()">确认并开始</button></div></div></div>
 <div class="modal-overlay" id="pauseModal"><div class="modal"><h2>已暂停</h2><div class="modal-actions" style="justify-content:center;flex-direction:column;gap:8px;"><button onclick="resumePlay()">继续</button><button class="secondary" onclick="retryPlay()">重试</button><button class="danger" onclick="exitPlay()">退出</button></div></div></div>
 <div class="modal-overlay" id="resultModal"><div class="modal"><h2>游戏结算</h2><div id="resultScore" class="result-score">0</div><div class="modal-actions" style="justify-content:center;"><button onclick="closeResultModal()">关闭</button></div></div></div>
 <div class="toast" id="toast"></div>
@@ -166,20 +167,20 @@
       <button class="help-close" onclick="closeHelp()">✕</button>
     </div>
   </div>
-<script src="state.js"></script>
-<script src="presets.js"></script>
-<script src="validation.js"></script>
-<script src="ui.js"></script>
-<script src="audio.js"></script>
-<script src="sfx.js"></script>
-<script src="io.js"></script>
-<script src="notes.js"></script>
-<script src="tracks.js"></script>
-<script src="timeline.js"></script>
-<script src="preview.js"></script>
-<script src="gameplay.js"></script>
-<script src="undo.js"></script>
-<script src="init.js"></script>
+<script src="js/state.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/validation.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sfx.js"></script>
+<script src="js/io.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/tracks.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/gameplay.js"></script>
+<script src="js/undo.js"></script>
+<script src="js/init.js"></script>
 </body>
 </html>
 

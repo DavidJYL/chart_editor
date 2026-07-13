@@ -12,7 +12,8 @@ var game = {
   judgments: {}, combo: 0, score: 0,
   effects: [], holdRingShrink: {},
   autoHits: new Set(), keysDown: {},
-  simulHitKeys: new Set()
+  simulHitKeys: new Set(),
+  playFromAFlag: false
 };
 
 // === JUDGMENT ===
@@ -25,7 +26,7 @@ function getJudgment(diffMs) {
   return "B";
 }
 
-function isTrackMapped(trackId) { return !!state.keyMap[trackId]; }
+function isTrackMapped(trackId) { var k = state.keyMap[trackId]; return k && k.length > 0; }
 
 function processAutoJudgments(currentTime) {
   for (var i = 0; i < state.notes.length; i++) {
@@ -35,7 +36,7 @@ function processAutoJudgments(currentTime) {
     if (note.type === 2) {
       if (isAuto) { if (currentTime >= note.time) applyJudgment(i, note, "P", note.time); }
       else {
-        var key = state.keyMap[note.track], isHeld = key && game.keysDown[key];
+        var keys = state.keyMap[note.track], isHeld = keys && keys.some(function(k) { return game.keysDown[k]; });
         var diffMs = (currentTime - note.time) * 1000;
         if (diffMs >= -60 && diffMs <= 60 && isHeld) applyJudgment(i, note, "P", currentTime);
         else if (diffMs > 60) applyJudgment(i, note, "M", currentTime);
@@ -57,7 +58,7 @@ function processHoldContinuous(currentTime) {
     var isAuto = (game.mode === "preview") || !isTrackMapped(note.track);
     if (isAuto) { if (currentTime >= endT) { j.holdState = "done"; setHoldRingShrink(note.track, false); } }
     else {
-      var key = state.keyMap[note.track], isHeld = key && game.keysDown[key];
+      var keys = state.keyMap[note.track], isHeld = keys && keys.some(function(k) { return game.keysDown[k]; });
       if (currentTime >= endT - 0.060) { if (currentTime >= endT) { j.holdState = "done"; setHoldRingShrink(note.track, false); } }
       else if (!isHeld) { j.holdState = "broken"; revertAndMiss(i, j); setHoldRingShrink(note.track, false); }
     }
@@ -131,17 +132,23 @@ function showPlayModal() {
   var defaults = getDefaultKeyMap(sortedUsed);
   state.keyMap = {};
   for (var i = 0; i < sortedUsed.length; i++) {
-    var tid = sortedUsed[i]; state.keyMap[tid] = remembered[tid] || defaults[tid] || "";
+    var tid = sortedUsed[i]; state.keyMap[tid] = toKeyArray(remembered[tid]) || toKeyArray(defaults[tid]) || [];
   }
   renderKeyMapList(sortedUsed);
   document.getElementById("keyMapModal").classList.add("active");
+}
+
+function toKeyArray(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v) return [v];
+  return null;
 }
 
 function getDefaultKeyMap(usedTracks) {
   var n = usedTracks.length;
   var presets = { 4: ["D","F","J","K"], 5: ["D","F"," ","J","K"], 6: ["S","D","F","J","K","L"], 7: ["S","D","F"," ","J","K","L"], 8: ["W","E","R","V","N","U","I","O"] };
   var map = {};
-  if (presets[n]) { for (var i = 0; i < usedTracks.length; i++) map[usedTracks[i]] = presets[n][i]; }
+  if (presets[n]) { for (var i = 0; i < usedTracks.length; i++) map[usedTracks[i]] = [presets[n][i]]; }
   return map;
 }
 
@@ -150,19 +157,40 @@ function renderKeyMapList(usedTracks) {
   var total = state.tracks.length;
   for (var i = 0; i < usedTracks.length; i++) {
     var tid = usedTracks[i], hue = hueForTrack(tid, total);
-    var key = state.keyMap[tid] || "";
     var row = document.createElement("div");
     row.className = "keymap-row"; row.dataset.trackId = tid;
-    row.innerHTML = "<span class=\"color-dot\" style=\"background:" + hslStr(hue, 100, 55) + "\"></span><span class=\"track-label\">轨道 " + tid + "</span><span class=\"key-display " + (key ? "" : "unbound") + "\">" + (formatKey(key) || "未绑定") + "</span>";
-    row.onclick = (function(t) { return function() { startKeyBinding(row, t); }; })(tid);
+    row.innerHTML = "<span class=\"color-dot\" style=\"background:" + hslStr(hue, 100, 55) + "\"></span><span class=\"track-label\">轨道 " + tid + "</span>";
+    var keyList = document.createElement("div");
+    keyList.className = "key-list";
+    row.appendChild(keyList);
+    renderKeyListForRow(row, tid);
     list.appendChild(row);
   }
+}
+
+function renderKeyListForRow(row, tid) {
+  var keys = state.keyMap[tid] || [];
+  var keyList = row.querySelector(".key-list");
+  keyList.innerHTML = "";
+  for (var i = 0; i < keys.length; i++) {
+    var badge = document.createElement("span");
+    badge.className = "key-badge";
+    badge.setAttribute("data-key", keys[i]);
+    badge.onclick = (function(t, k) { return function(e) { e.stopPropagation(); removeKeyFromTrack(t, k); }; })(tid, keys[i]);
+    keyList.appendChild(badge);
+  }
+  var addBtn = document.createElement("span");
+  addBtn.className = "key-badge add";
+  addBtn.textContent = "+";
+  addBtn.onclick = (function(t) { return function(e) { e.stopPropagation(); startKeyBinding(row, t); }; })(tid);
+  keyList.appendChild(addBtn);
 }
 
 function startKeyBinding(row, tid) {
   if (bindingRow) bindingRow.classList.remove("binding");
   bindingRow = row; row.classList.add("binding");
-  var disp = row.querySelector(".key-display"); disp.textContent = "按键..."; disp.classList.remove("unbound");
+  var addBtn = row.querySelector(".key-badge.add");
+  if (addBtn) addBtn.textContent = "?";
 }
 
 function captureBindKey(e) {
@@ -170,9 +198,19 @@ function captureBindKey(e) {
   e.preventDefault();
   var tid = parseInt(bindingRow.dataset.trackId);
   var keyStr = serializeKey(e);
-  state.keyMap[tid] = keyStr;
-  var disp = bindingRow.querySelector(".key-display"); disp.textContent = formatKey(keyStr); disp.classList.remove("unbound");
+  if (!state.keyMap[tid]) state.keyMap[tid] = [];
+  if (state.keyMap[tid].indexOf(keyStr) < 0) state.keyMap[tid].push(keyStr);
+  renderKeyListForRow(bindingRow, tid);
   bindingRow.classList.remove("binding"); bindingRow = null;
+}
+
+function removeKeyFromTrack(tid, keyStr) {
+  var keys = state.keyMap[tid];
+  if (!keys) return;
+  var idx = keys.indexOf(keyStr);
+  if (idx >= 0) keys.splice(idx, 1);
+  var row = document.querySelector("[data-track-id='" + tid + "']");
+  if (row) renderKeyListForRow(row, tid);
 }
 
 function serializeKey(e) {
@@ -183,18 +221,18 @@ function serializeKey(e) {
   return mods.concat([k]).join("+");
 }
 
-function formatKey(k) { return k || ""; }
+function formatKeys(keys) { return Array.isArray(keys) ? keys.join(" / ") : ""; }
 
 function resetKeyMapDefault() {
   var usedTracks = Object.keys(state.keyMap).map(Number).sort(function(a, b) { return a - b; });
   var def = getDefaultKeyMap(usedTracks);
-  for (var i = 0; i < usedTracks.length; i++) state.keyMap[usedTracks[i]] = def[usedTracks[i]] || "";
+  for (var i = 0; i < usedTracks.length; i++) state.keyMap[usedTracks[i]] = def[usedTracks[i]] || [];
   renderKeyMapList(usedTracks);
 }
 
 function confirmKeyMapAndPlay() {
   var usedTracks = Object.keys(state.keyMap).map(Number).sort(function(a, b) { return a - b; });
-  for (var i = 0; i < usedTracks.length; i++) { if (!state.keyMap[usedTracks[i]]) { showToast("轨道 " + usedTracks[i] + " 未绑定按键，无法开始", "error"); return; } }
+  for (var i = 0; i < usedTracks.length; i++) { if (!state.keyMap[usedTracks[i]] || state.keyMap[usedTracks[i]].length === 0) { showToast("轨道 " + usedTracks[i] + " 未绑定按键，无法开始", "error"); return; } }
   var memKey = "halovia_keymap_" + usedTracks.join(",");
   localStorage.setItem(memKey, JSON.stringify(state.keyMap));
   closeKeyMapModal();
@@ -283,7 +321,7 @@ document.addEventListener("keyup", function(e) {
 
 function handleKeyPress(keyStr) {
   var tracks = [];
-  for (var tid in state.keyMap) { if (state.keyMap[tid] === keyStr) tracks.push(parseInt(tid)); }
+  for (var tid in state.keyMap) { if (Array.isArray(state.keyMap[tid]) && state.keyMap[tid].indexOf(keyStr) >= 0) tracks.push(parseInt(tid)); }
   if (tracks.length === 0) return;
   for (var ti = 0; ti < tracks.length; ti++) {
     var tid = tracks[ti], bestIdx = -1, bestDiff = Infinity;

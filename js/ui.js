@@ -92,12 +92,24 @@ function updateLoopUI() {
   document.getElementById("btnLoopToggle").textContent = en ? "■" : "↺";
   document.getElementById("btnLoopA").className = a !== null ? "small" : "small secondary";
   document.getElementById("btnLoopB").className = b !== null ? "small" : "small secondary";
-  document.getElementById("btnPlayA").textContent = game.playFromAFlag ? "■" : "▶";
   document.getElementById("btnPlayA").className = game.playFromAFlag ? "small" : "small secondary";
+  document.getElementById("btnPlayA").textContent = game.playFromAFlag ? "■" : "▶";
   var info = "";
   if (a !== null) info = "A:" + a.toFixed(2) + "s";
   if (b !== null) info += (info ? "  " : "") + "B:" + b.toFixed(2) + "s";
   document.getElementById("loopInfo").textContent = info;
+}
+
+function endPlayback() {
+  game.playing = false; game.paused = false;
+  game.playFromAFlag = false; state.loopEnabled = false;
+  stopAudio();
+  document.getElementById("btnPlay").textContent = "▶";
+  updateLoopUI();
+}
+
+function cancelPlayModes() {
+  if (game.playFromAFlag || state.loopEnabled) endPlayback();
 }
 
 function setLoopA() {
@@ -126,21 +138,7 @@ function setLoopB() {
   showToast("循环终点 B = " + state.loopB.toFixed(2) + "s", "info");
 }
 
-function toggleLoop() {
-  if (state.loopA === null || state.loopB === null) {
-    showToast("请先设置 A 和 B 点", "warn");
-    return;
-  }
-  if (state.loopEnabled) {
-    // ■ 暂停
-    state.loopEnabled = false;
-    game.playFromAFlag = false;
-    if (game.playing && typeof pausePreview === "function") pausePreview();
-    else if (typeof stopPlay === "function") stopPlay();
-    updateLoopUI();
-    showToast("循环已暂停", "info");
-    return;
-  }
+function _startLoop() {
   state.loopEnabled = true;
   game.playFromAFlag = false;
   if (game.gameTime < state.loopA || game.gameTime > state.loopB) game.gameTime = state.loopA;
@@ -152,23 +150,32 @@ function toggleLoop() {
     game.playing = true; game.paused = false; game.mode = "preview";
     game.autoHits = new Set(); game.judgments = {}; game.combo = 0; game.score = 0;
     game.holdRingShrink = {}; game.effects = [];
-    document.getElementById("btnPlay").textContent = "⏸ 暂停";
+    document.getElementById("btnPlay").textContent = "⏸";
   }
   updateLoopUI();
   showToast("循环已开启", "info");
 }
 
+function toggleLoop() {
+  if (state.loopA === null || state.loopB === null) {
+    showToast("请先设置 A 和 B 点", "warn");
+    return;
+  }
+  if (state.loopEnabled) {
+    endPlayback();
+    return;
+  }
+  _startLoop();
+}
+
 function clearLoop() {
-  state.loopA = null; state.loopB = null; state.loopEnabled = false;
-  game.playFromAFlag = false;
+  state.loopA = null; state.loopB = null;
+  cancelPlayModes();
   updateLoopUI();
   showToast("AB 循环已清除", "info");
 }
 
-function playFromA() {
-  if (game.playFromAFlag) { pausePreview(); return; }
-  if (state.loopA === null) { showToast("请先设置 A 点", "warn"); return; }
-  if (state.loopB === null || state.loopB <= state.loopA) { showToast("请先设置 B 点（需大于 A）", "warn"); return; }
+function _startPlayFromA() {
   state.loopEnabled = false;
   game.playFromAFlag = true;
   game.gameTime = state.loopA;
@@ -178,7 +185,39 @@ function playFromA() {
   game.autoHits = new Set(); game.judgments = {}; game.combo = 0; game.score = 0;
   game.holdRingShrink = {}; game.effects = [];
   if (state.audioBuffer) startAudioAt(state.loopA);
-  document.getElementById("btnPlay").textContent = "⏸ 暂停";
+  document.getElementById("btnPlay").textContent = "⏸";
   updateLoopUI();
+}
+
+// === 全局 Esc 关闭弹窗 ===
+document.addEventListener("keydown", function(e) {
+  if (e.key !== "Escape") return;
+  // 优先让已有 Escape 处理器处理（游戏/全屏/键位绑定），不重复关闭
+  // 仅关闭模态框覆盖层
+  var modals = [
+    { id: "importModal", close: closeImportModal },
+    { id: "noteEditModal", close: closeNoteEditModal },
+    { id: "keyMapModal", close: closeKeyMapModal },
+    { id: "resultModal", close: closeResultModal },
+    { id: "helpModal", close: closeHelp }
+  ];
+  for (var i = 0; i < modals.length; i++) {
+    var el = document.getElementById(modals[i].id);
+    if (el && el.classList.contains("active")) {
+      e.preventDefault();
+      modals[i].close();
+      return;
+    }
+  }
+});
+
+function playFromA() {
+  if (game.playFromAFlag) {
+    endPlayback();
+    return;
+  }
+  if (state.loopA === null) { showToast("请先设置 A 点", "warn"); return; }
+  if (state.loopB === null || state.loopB <= state.loopA) { showToast("请先设置 B 点（需大于 A）", "warn"); return; }
+  _startPlayFromA();
 }
 

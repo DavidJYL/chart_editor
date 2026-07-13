@@ -4,6 +4,10 @@
    ============================================================ */
 "use strict";
 
+var _syncingScroll = false;
+var _lastEditTid = -1;
+var _activeTrackId = -1;
+
 // === TRACK DIRECTORY & PANELS ===
 
 function applyStateToUI() {
@@ -24,6 +28,10 @@ function applyStateToUI() {
   var aiEl = document.getElementById("audioInfo");
   if (aiEl && state.audioPath) { aiEl.textContent = state.audioPath + " (已关联)"; aiEl.title = state.audioPath; }
   renderTrackDirectory();
+  // 如果没有活动轨道，默认打开第一个
+  if (_activeTrackId < 0 || state.openedTracks.indexOf(_activeTrackId) < 0) {
+    if (state.openedTracks.length > 0) _activeTrackId = state.openedTracks[0];
+  }
   renderTrackPanels();
   if (typeof resizePreview === "function") resizePreview();
   if (typeof resizeTimeline === "function") resizeTimeline();
@@ -36,6 +44,7 @@ function addNewTrack() {
   var id = state.tracks.length;
   state.tracks.push(createDefaultTrack(id));
   state.openedTracks.push(id);
+  _lastEditTid = id;
   renderTrackDirectory();
   renderTrackPanels();
   scheduleSizeEstimate();
@@ -48,6 +57,7 @@ function deleteTrack(id) {
   state.tracks.forEach(function(t, i) { t.id = i; });
   state.notes = state.notes.filter(function(n) { return n.track !== id; }).map(function(n) { return { track: n.track > id ? n.track - 1 : n.track, type: n.type, time: n.time, endTime: n.endTime }; });
   state.openedTracks = state.openedTracks.filter(function(t) { return t !== id; }).map(function(t) { return t > id ? t - 1 : t; });
+  _lastEditTid = id;
   renderTrackDirectory();
   renderTrackPanels();
   scheduleSizeEstimate();
@@ -55,10 +65,26 @@ function deleteTrack(id) {
 
 function toggleTrackOpen(id) {
   var idx = state.openedTracks.indexOf(id);
-  if (idx >= 0) state.openedTracks.splice(idx, 1);
-  else state.openedTracks.push(id);
-  renderTrackDirectory();
-  renderTrackPanels();
+  if (idx < 0) {
+    // 未打开 → 打开并滚动到该轨道
+    state.openedTracks.push(id);
+    _activeTrackId = id;
+    renderTrackDirectory();
+    renderTrackPanels();
+    scrollToTrack(id);
+  } else if (id === _activeTrackId) {
+    // 已打开且是当前活动轨道 → 关闭
+    state.openedTracks.splice(idx, 1);
+    _activeTrackId = state.openedTracks.length > 0 ? state.openedTracks[0] : -1;
+    renderTrackDirectory();
+    renderTrackPanels();
+  } else {
+    // 已打开但不是活动轨道 → 切换到该轨道
+    _activeTrackId = id;
+    renderTrackDirectory();
+    scrollToTrack(id);
+  }
+  _lastEditTid = id;
 }
 
 function renderTrackDirectory() {
@@ -70,7 +96,7 @@ function renderTrackDirectory() {
     var hue = hueForTrack(i, total);
     var isOpen = state.openedTracks.indexOf(track.id) >= 0;
     var item = document.createElement("div");
-    item.className = "dir-item" + (isOpen ? " active" : "");
+    item.className = "dir-item" + (isOpen || track.id === _activeTrackId ? " active" : "");
     item.innerHTML = "<span class=\"color-dot\" style=\"background:" + hslStr(hue, 100, 55) + "\"></span>轨道" + i;
     item.onclick = (function(tid) { return function() { toggleTrackOpen(tid); }; })(track.id);
     item.oncontextmenu = (function(tid) { return function(e) { e.preventDefault(); deleteTrack(tid); }; })(track.id);
@@ -78,10 +104,40 @@ function renderTrackDirectory() {
   }
 }
 
+function scrollToTrack(tid) {
+  var c = document.getElementById("trackPanels");
+  if (!c) return;
+  var containerEl = c.parentElement;
+  if (!containerEl) return;
+  var p = c.querySelectorAll(".track-panel");
+  for (var pi = 0; pi < p.length; pi++) {
+    var hdr = p[pi].querySelector(".track-panel-title span:last-child");
+    var ptid = hdr ? parseInt((hdr.textContent || "").replace("轨道 ", "")) : -1;
+    if (ptid === tid) {
+      containerEl.scrollTo({ behavior: "smooth", left: pi * 370 });
+      break;
+    }
+  }
+  _activeTrackId = tid;
+  renderTrackDirectory();
+}
+
 // === KEYFRAME PANEL RENDERING ===
 function renderTrackPanels() {
   var container = document.getElementById("trackPanels");
-  container.innerHTML = "";
+  // 按轨道 ID 保存滚动位置，避免面板顺序变化导致错位
+  var oldPanels = container.querySelectorAll(".track-panel");
+  var scrollTopMap = {};
+  for (var pi = 0; pi < oldPanels.length; pi++) {
+    var hdr = oldPanels[pi].querySelector(".track-panel-title span:last-child");
+    var tid = hdr ? parseInt((hdr.textContent || "").replace("轨道 ", "")) : -1;
+    if (tid >= 0) scrollTopMap[tid] = oldPanels[pi].scrollTop;
+  }
+  // 重建前先失焦，避免浏览器将已销毁的聚焦元素滚动到顶部
+  if (document.activeElement && container.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+  var frag = document.createDocumentFragment();
   var total = state.tracks.length;
   for (var oi = 0; oi < state.openedTracks.length; oi++) {
     var tid = state.openedTracks[oi];
@@ -105,10 +161,23 @@ function renderTrackPanels() {
         body += renderKF(tid, si + 1, kfNext);
       }
     }
-    body += "<div style=\"padding:6px;\"><button class=\"small\" onclick=\"addKeyframe(" + tid + ")\">+ 关键帧</button></div>";
-    panel.innerHTML = "<div class=\"track-panel-header\"><div class=\"track-panel-title\"><span class=\"color-dot\" style=\"display:inline-block;width:12px;height:12px;border-radius:50%;background:" + hslStr(hue, 100, 55) + "\"></span><span>轨道 " + tid + "</span></div></div>" + body;
-    container.appendChild(panel);
+    panel.innerHTML = "<div class=\"track-panel-header\"><div class=\"track-panel-title\"><span class=\"color-dot\" style=\"display:inline-block;width:12px;height:12px;border-radius:50%;background:" + hslStr(hue, 100, 55) + "\"></span><span>轨道 " + tid + "</span></div><button class=\"small\" onclick=\"addKeyframe(" + tid + ")\">+ 关键帧</button></div>" + body;
+    // 多面板同步滚动：按百分比对齐
+    panel.onscroll = function() {
+      if (_syncingScroll) return;
+      _syncingScroll = true;
+      var pct = this.scrollTop / (this.scrollHeight - this.clientHeight || 1);
+      var all = container.querySelectorAll(".track-panel");
+      for (var pi = 0; pi < all.length; pi++) {
+        if (all[pi] !== this) {
+          all[pi].scrollTop = pct * (all[pi].scrollHeight - all[pi].clientHeight || 1);
+        }
+      }
+      _syncingScroll = false;
+    };
+    frag.appendChild(panel);
   }
+  container.replaceChildren(frag);
   var inputs = container.querySelectorAll("input.expr-input");
   for (var ii = 0; ii < inputs.length; ii++) {
     var el = inputs[ii];
@@ -133,13 +202,22 @@ function renderTrackPanels() {
       };
     })(tid2, si, pk, role, el));
   }
+  // 按轨道 ID 恢复滚动位置
+  var newPanels = container.querySelectorAll(".track-panel");
+  _syncingScroll = true;
+  for (var pi = 0; pi < newPanels.length; pi++) {
+    var hdr = newPanels[pi].querySelector(".track-panel-title span:last-child");
+    var tid = hdr ? parseInt((hdr.textContent || "").replace("轨道 ", "")) : -1;
+    if (tid >= 0 && scrollTopMap[tid] !== undefined) newPanels[pi].scrollTop = scrollTopMap[tid];
+  }
+  _syncingScroll = false;
 }
 
 function renderKF(tid, ki, kf) {
   if (!kf) return "";
   var hue = hueForTrack(tid, state.tracks.length);
   var hiddenChk = kf.hidden ? " checked" : "";
-  return "<div class=\"segment-card\"><div class=\"segment-row\"><span class=\"color-dot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:" + hslStr(hue, 100, 60) + "\"></span><strong style=\"font-size:0.85em;color:var(--fg2);\">#" + ki + "</strong><div class=\"field\"><label>时间</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.time.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-role=\"kfTime\"></div><div class=\"field\"><label>X</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.x.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-pk=\"x\" data-role=\"kfPos\"></div><div class=\"field\"><label>Y</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.y.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-pk=\"y\" data-role=\"kfPos\"></div><div class=\"field\"><label>&nbsp;</label><label class=\"inline-chk\"><input type=\"checkbox\" onchange=\"toggleKFHidden(" + tid + "," + ki + ",this.checked)\"" + hiddenChk + ">隐藏</label></div>" + (ki > 0 ? "<div class=\"field delete\"><label>&nbsp;</label><button class=\"small danger\" onclick=\"removeKeyframe(" + tid + "," + ki + ")\">✕</button></div>" : "") + "</div></div>";
+  return "<div class=\"segment-card\"><div class=\"segment-row\"><span class=\"color-dot\" style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:" + hslStr(hue, 100, 60) + "\"></span><strong style=\"font-size:0.85em;color:var(--fg2);\">#" + ki + "</strong><div class=\"field float-label\"><label>时间</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.time.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-role=\"kfTime\"></div><div class=\"field float-label\"><label>X</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.x.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-pk=\"x\" data-role=\"kfPos\"></div><div class=\"field float-label\"><label>Y</label><input type=\"text\" class=\"expr-input\" value=\"" + kf.y.toFixed(3) + "\" data-tid=\"" + tid + "\" data-si=\"" + ki + "\" data-pk=\"y\" data-role=\"kfPos\"></div><div class=\"field\"><label>&nbsp;</label><label class=\"inline-chk\"><input type=\"checkbox\" onchange=\"toggleKFHidden(" + tid + "," + ki + ",this.checked)\"" + hiddenChk + ">隐藏</label></div>" + (ki > 0 ? "<div class=\"field delete\"><label>&nbsp;</label><button class=\"small danger\" onclick=\"removeKeyframe(" + tid + "," + ki + ")\">✕</button></div>" : "") + "</div></div>";
 }
 
 function renderSegmentPreset(tid, si, seg) {
@@ -150,7 +228,7 @@ function renderSegmentPreset(tid, si, seg) {
       presetOpts += "<option value=\"" + pk2 + "\"" + (seg.preset === pk2 ? " selected" : "") + ">" + PRESETS[pk2].name + "</option>";
     }
   }
-  var label = (si === 0 ? "" : "&nbsp;") + "⟶ 段" + si;
+  var label = "#" + si + "~#" + (si + 1);
   var paramsHTML = "";
   if (preset && preset.params) {
     for (var pi = 0; pi < preset.params.length; pi++) {
@@ -162,17 +240,17 @@ function renderSegmentPreset(tid, si, seg) {
         var lbl = PARAM_LABELS[pk] || pk;
         var val = seg.params[pk] !== undefined ? seg.params[pk] : PARAM_DEFAULTS[pk];
         if (pk === "funcX" || pk === "funcY") {
-          paramsHTML += "<div class=\"field\"><label>" + lbl + "</label><select onchange=\"updateSegParam(" + tid + "," + si + ",'" + pk + "',this.value)\"><option value=\"sin\"" + (val === "sin" ? " selected" : "") + ">sin</option><option value=\"cos\"" + (val === "cos" ? " selected" : "") + ">cos</option></select></div>";
+          paramsHTML += "<div class=\"field float-label\"><label>" + lbl + "</label><select onchange=\"updateSegParam(" + tid + "," + si + ",'" + pk + "',this.value)\"><option value=\"sin\"" + (val === "sin" ? " selected" : "") + ">sin</option><option value=\"cos\"" + (val === "cos" ? " selected" : "") + ">cos</option></select></div>";
         } else if (pk === "xExpr" || pk === "yExpr") {
-          paramsHTML += "<div class=\"field expr\"><label>" + lbl + "</label><input type=\"text\" value=\"" + escapeHtmlAttr(String(val)) + "\" onchange=\"updateSegParam(" + tid + "," + si + ",'" + pk + "',this.value)\"></div>";
+          paramsHTML += "<div class=\"field expr float-label\"><label>" + lbl + "</label><input type=\"text\" value=\"" + escapeHtmlAttr(String(val)) + "\" onchange=\"updateSegParam(" + tid + "," + si + ",'" + pk + "',this.value)\"></div>";
         } else {
-          paramsHTML += "<div class=\"field\"><label>" + lbl + "</label><input type=\"text\" class=\"expr-input\" value=\"" + escapeHtmlAttr(exprRaw(val, 0)) + "\" data-tid=\"" + tid + "\" data-si=\"" + si + "\" data-pk=\"" + pk + "\" data-role=\"segParam\"></div>";
+          paramsHTML += "<div class=\"field float-label\"><label>" + lbl + "</label><input type=\"text\" class=\"expr-input\" value=\"" + escapeHtmlAttr(exprRaw(val, 0)) + "\" data-tid=\"" + tid + "\" data-si=\"" + si + "\" data-pk=\"" + pk + "\" data-role=\"segParam\"></div>";
         }
       }
     }
   }
   var lissajousBtn = seg.preset === "lissajous" ? "<button class=\"small secondary\" onclick=\"apply8Preset(" + tid + "," + si + ")\">8字</button>" : "";
-  return "<div class=\"segment-card\" style=\"border-left-color:var(--accent);margin:2px 0;\"><div class=\"segment-row\"><span style=\"font-size:0.85em;color:var(--accent);font-weight:bold;\">" + label + "</span><div class=\"field\"><label>预设</label><select onchange=\"changeSegPreset(" + tid + "," + si + ",this.value)\">" + presetOpts + "</select></div>" + paramsHTML + (lissajousBtn ? "<div class=\"field\"><label>&nbsp;</label>" + lissajousBtn + "</div>" : "") + "</div></div>";
+  return "<div class=\"segment-card\" style=\"border-left-color:var(--accent);margin:2px 0;\"><div class=\"segment-row\"><span style=\"font-size:0.85em;color:var(--accent);font-weight:bold;\">" + label + "</span><div class=\"field float-label\"><label>预设</label><select onchange=\"changeSegPreset(" + tid + "," + si + ",this.value)\">" + presetOpts + "</select></div>" + paramsHTML + (lissajousBtn ? "<div class=\"field\"><label>&nbsp;</label>" + lissajousBtn + "</div>" : "") + "</div></div>";
 }
 
 // === KEYFRAME OPERATIONS ===
@@ -202,8 +280,23 @@ function addKeyframe(tid) {
       var sps = track.segmentPresets;
       var oldPreset = sps[insIdx - 1] ? { preset: sps[insIdx - 1].preset, params: JSON.parse(JSON.stringify(sps[insIdx - 1].params || {})) } : { preset: "line", params: {} };
       sps.splice(insIdx, 0, oldPreset);
+      _lastEditTid = tid;
       renderTrackPanels();
       scheduleSizeEstimate();
+      // 滚动到新关键帧所在位置
+      scrollToTrack(tid);
+      var c2 = document.getElementById("trackPanels");
+      if (c2) {
+        var allStrong = c2.querySelectorAll("strong");
+        for (var si = 0; si < allStrong.length; si++) {
+          if (allStrong[si].textContent === "#" + insIdx) {
+            requestAnimationFrame(function() {
+              allStrong[si].scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+            });
+            break;
+          }
+        }
+      }
       return;
     }
   }
@@ -218,6 +311,7 @@ function removeKeyframe(tid, ki) {
       if (typeof pushUndo === "function") pushUndo();
       track.keyframes.splice(ki, 1);
       if (ki < track.segmentPresets.length) track.segmentPresets.splice(ki, 1);
+      _lastEditTid = tid;
       renderTrackPanels();
       scheduleSizeEstimate();
       return;
@@ -286,6 +380,7 @@ function changeSegPreset(tid, si, preset) {
       break;
     }
   }
+  _lastEditTid = tid;
   renderTrackPanels();
 }
 
@@ -302,5 +397,6 @@ function apply8Preset(tid, si) {
       break;
     }
   }
+  _lastEditTid = tid;
   renderTrackPanels();
 }

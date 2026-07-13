@@ -1,0 +1,3 @@
+﻿[sandbox]
+workspace_root = "D:\\Projects\\chart-editor"
+allow_write = ["D:\\Projects\\chart-editor"]

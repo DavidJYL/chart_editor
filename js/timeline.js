@@ -107,6 +107,24 @@ function findNoteAt(x, y) {
 }
 
 // === TIMELINE EVENTS ===
+function onSeekNotify(newTime, oldTime) {
+  if (newTime > oldTime) {
+    for (var i = 0; i < state.notes.length; i++) {
+      var note = state.notes[i];
+      if (note.time > oldTime && note.time <= newTime && (!game.judgments[i] || !game.judgments[i].judged)) {
+        game.judgments[i] = { judged: true, result: "none", judgeTime: newTime, holdState: note.type === 3 ? "done" : "done" };
+      }
+    }
+  } else if (newTime < oldTime) {
+    for (var i = 0; i < state.notes.length; i++) {
+      var note = state.notes[i];
+      if (note.time > newTime && game.judgments[i]) {
+        delete game.judgments[i];
+      }
+    }
+  }
+}
+
 function onTimelineMouseDown(e) {
   var rect = timeline.canvas.getBoundingClientRect();
   var x = e.clientX - rect.left, y = e.clientY - rect.top;
@@ -121,9 +139,11 @@ function onTimelineMouseDown(e) {
   if (e.button === 0) {
     var cx = timeToX(game.gameTime);
     if (y < timeline.rulerH || (cx >= 0 && cx <= timeline.W && Math.abs(x - cx) < 10)) {
+      if (typeof cancelPlayModes === "function") cancelPlayModes();
       var t2 = Math.max(0, Math.min(state.duration, xToTime(x)));
+      var oldT = game.gameTime;
       game.gameTime = t2; game.startGameTime = t2; game.startRealTime = performance.now();
-      game.judgments = {}; game.autoHits = new Set(); game.combo = 0; game.score = 0;
+      game.autoHits = new Set(); onSeekNotify(t2, oldT);
       updateTimeDisplay();
       if (game.playing && state.audioBuffer) startAudioAt(t2);
       timeline.playheadDrag = true;
@@ -209,8 +229,9 @@ function onTimelineMouseMove(e) {
     if (state.loopEnabled && state.loopA !== null && state.loopB !== null) {
       newT = Math.max(state.loopA, Math.min(state.loopB, newT));
     }
+    var oldT2 = game.gameTime;
     game.gameTime = newT; game.startGameTime = newT; game.startRealTime = performance.now();
-    game.judgments = {}; game.autoHits = new Set(); game.combo = 0; game.score = 0;
+    game.autoHits = new Set(); onSeekNotify(newT, oldT2);
     updateTimeDisplay();
     return;
   }
@@ -449,11 +470,11 @@ function renderTimeline() {
     ctx.font = "10px monospace";
     if (ax >= 0 && ax <= W) {
       ctx.strokeStyle = "rgba(46,204,113," + lineAlpha + ")"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, H); ctx.stroke();
-      ctx.fillStyle = "rgba(46,204,113,0.7)"; ctx.fillText("A", ax + 2, 11);
+      ctx.fillStyle = "rgba(46,204,113,0.7)"; ctx.fillText("A", ax + 2, H - 4);
     }
     if (bx >= 0 && bx <= W && (state.loopB !== state.loopA || state.loopA === null)) {
       ctx.strokeStyle = "rgba(46,204,113," + lineAlpha + ")"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, H); ctx.stroke();
-      ctx.fillStyle = "rgba(46,204,113,0.7)"; ctx.fillText("B", bx + 2, 11);
+      ctx.fillStyle = "rgba(46,204,113,0.7)"; ctx.fillText("B", bx + 2, H - 4);
     }
   }
   if (cx >= 0 && cx <= W) {
