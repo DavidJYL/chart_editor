@@ -1,9 +1,9 @@
 # HALOVIA 制谱器 — Chart Editor
 
-> **🚀 当前开发分支**
-> 此分支（`v5R`）为当前活跃开发分支，由 Reasonix 驱动。
+> **📦 分支已归档 — 不再维护**
+> 此分支（`v5R`）已完成 v5 生命周期的开发，已归档冻结。后续开发请切换到 [`v6R`](https://github.com/halovia-game/chart-editor/tree/v6R) 分支。
 >
-> 历史存档：[`v4R`](https://github.com/halovia-game/chart-editor/tree/v4R) · [`v5OC`](https://github.com/halovia-game/chart-editor/tree/v5OC)
+> 最后版本：`v5.1` | 开发工具：Reasonix
 
 基于 Web 的 HALOVIA 谱面编辑器，纯前端零依赖，支持 `file://` 本地直接打开。
 
@@ -98,21 +98,21 @@ index.html
 
 ```
 ├── index.html        # 页面入口
-├── style.css         # 深色主题样式
-├── state.js          # 全局状态 + 表达式系统
-├── presets.js        # 运动预设 + 轨道求值
-├── tracks.js         # 轨道面板 UI
-├── timeline.js       # 时间轴 Canvas
-├── preview.js        # 3D 预览渲染
-├── notes.js          # 音符管理
-├── audio.js          # 音频 + 能量分析
-├── io.js             # 导入/导出
-├── ui.js             # UI 工具
-├── gameplay.js       # 试玩模式
-├── undo.js           # 撤销/重做
-├── init.js           # 初始化
-├── validation.js     # 校验
-├── sfx.js            # 音效
+├── css/style.css     # 深色主题样式
+├── js/state.js       # 全局状态 + 表达式系统
+├── js/presets.js     # 运动预设 + 轨道求值
+├── js/tracks.js      # 轨道面板 UI
+├── js/timeline.js    # 时间轴 Canvas
+├── js/preview.js     # 3D 预览渲染
+├── js/notes.js       # 音符管理
+├── js/audio.js       # 音频 + 能量分析
+├── js/io.js          # 导入/导出
+├── js/ui.js          # UI 工具
+├── js/gameplay.js    # 试玩模式
+├── js/undo.js        # 撤销/重做
+├── js/init.js        # 初始化
+├── js/validation.js  # 校验
+├── js/sfx.js         # 音效
 ├── sound/            # 音效文件（Tap.mp3, Keep.mp3, Hold.mp3）
 ├── HALOVIA.md        # 游戏介绍
 ├── HALOVIA_制谱器_v2_架构说明.md  # v2 架构分析
@@ -123,12 +123,15 @@ index.html
 
 | 分支 | 用途 | 维护策略 |
 |------|------|---------|
-| `main` | 稳定主线 | 仅通过 `v5R` merge 进入，**禁止直接提交** |
-| `v5R` | **当前开发分支（Reasonix）** | 日常开发在此进行，定期 merge 到 `main` |
+| 分支 | 用途 | 维护策略 |
+|------|------|---------|
+| `main` | 稳定主线 | 仅通过 `v6R` merge 进入，**禁止直接提交** |
+| `v6R` | **当前开发分支** | 日常开发在此进行，定期 merge 到 `main` |
+| `v5R` | 已归档存档 | 不再维护，保留历史 |
 | `v5OC` | 已冻结存档 | 不再维护，保留历史 |
 | `v4R` | 旧版存档 | 不再维护，保留历史 |
 
-工作流：`v5R` 开发 → `git merge v5R` 到 `main`（仅 merge，不 rebase）
+工作流：`v6R` 开发 → `git merge v6R` 到 `main`（仅 merge，不 rebase）；`v6R` 将重构页面结构（页面重构）。
 
 ## 开发
 
